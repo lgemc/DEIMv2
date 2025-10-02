@@ -1,0 +1,41 @@
+task: detection
+
+evaluator:
+  type: CocoEvaluator
+  iou_types: ['bbox', ]
+
+num_classes: 6
+remap_mscoco_category: False
+
+train_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_1024_1024/images/train/
+    ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/coco_1024_2014/train.json
+    return_masks: False
+    transforms:
+      type: Compose
+      ops: ~
+  shuffle: True
+  num_workers: 2
+  drop_last: True
+  collate_fn:
+    type: BatchImageCollateFunction
+
+
+val_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_1024_1024/images/val/
+    ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/coco_1024_2014/val.json
+    return_masks: False
+    transforms:
+      type: Compose
+      ops: ~
+  shuffle: False
+  num_workers: 4
+  drop_last: False
+  collate_fn:
+    type: BatchImageCollateFunction

@@ -113,6 +113,18 @@ class ConvertBoxes(T.Transform):
 
         return inpt
 
+    def forward(self, *inputs: Any) -> Any:
+        inputs = inputs if len(inputs) > 1 else inputs[0]
+        if isinstance(inputs, (list, tuple)):
+            outputs = list(inputs)
+            for i, inpt in enumerate(inputs):
+                if isinstance(inpt, BoundingBoxes):
+                    outputs[i] = self._transform(inpt, {})
+            return tuple(outputs) if isinstance(inputs, tuple) else outputs
+        elif isinstance(inputs, BoundingBoxes):
+            return self._transform(inputs, {})
+        return inputs
+
 
 @register()
 class ConvertPILImage(T.Transform):
@@ -135,3 +147,15 @@ class ConvertPILImage(T.Transform):
         inpt = Image(inpt)
 
         return inpt
+
+    def forward(self, *inputs: Any) -> Any:
+        inputs = inputs if len(inputs) > 1 else inputs[0]
+        if isinstance(inputs, (list, tuple)):
+            outputs = list(inputs)
+            for i, inpt in enumerate(inputs):
+                if isinstance(inpt, PIL.Image.Image):
+                    outputs[i] = self._transform(inpt, {})
+            return tuple(outputs) if isinstance(inputs, tuple) else outputs
+        elif isinstance(inputs, PIL.Image.Image):
+            return self._transform(inputs, {})
+        return inputs
