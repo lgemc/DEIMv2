@@ -115,6 +115,19 @@ class ConvertBoxes(T.Transform):
 
     def forward(self, *inputs: Any) -> Any:
         inputs = inputs if len(inputs) > 1 else inputs[0]
+
+        # Handle (image, target, dataset) tuple format
+        if isinstance(inputs, (list, tuple)) and len(inputs) >= 2 and isinstance(inputs[1], dict):
+            image, target = inputs[0], inputs[1]
+            rest = inputs[2:] if len(inputs) > 2 else ()
+
+            # Process boxes inside target dict
+            if 'boxes' in target and isinstance(target['boxes'], BoundingBoxes):
+                target['boxes'] = self._transform(target['boxes'], {})
+
+            return (image, target) + rest if isinstance(inputs, tuple) else [image, target] + list(rest)
+
+        # Original logic for direct BoundingBoxes
         if isinstance(inputs, (list, tuple)):
             outputs = list(inputs)
             for i, inpt in enumerate(inputs):

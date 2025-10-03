@@ -122,9 +122,55 @@ class DetSolver(BaseSolver):
             )
 
             for k in test_stats:
-                if self.writer and dist_utils.is_main_process():
-                    for i, v in enumerate(test_stats[k]):
-                        self.writer.add_scalar(f'Test/{k}_{i}'.format(k), v, epoch)
+                # Skip non-list metrics (like f1_metrics dict)
+                if isinstance(test_stats[k], list):
+                    if self.writer and dist_utils.is_main_process():
+                        for i, v in enumerate(test_stats[k]):
+                            self.writer.add_scalar(f'Test/{k}_{i}'.format(k), v, epoch)
+
+            # Log metrics to W&B
+            if self.wandb_logger and dist_utils.is_main_process():
+                wandb_metrics = {'epoch': epoch}
+
+                # Log COCO metrics
+                if 'coco_eval_bbox' in test_stats:
+                    coco_stats = test_stats['coco_eval_bbox']
+                    wandb_metrics.update({
+                        'Metrics/AP': coco_stats[0],
+                        'Metrics/AP50': coco_stats[1],
+                        'Metrics/AP75': coco_stats[2],
+                        'Metrics/AP_small': coco_stats[3],
+                        'Metrics/AP_medium': coco_stats[4],
+                        'Metrics/AP_large': coco_stats[5],
+                        'Metrics/AR': coco_stats[8]
+                    })
+
+                # Log F1 metrics
+                if 'f1_metrics' in test_stats:
+                    f1_data = test_stats['f1_metrics']['overall']
+                    wandb_metrics.update({
+                        'Metrics/F1': f1_data['f1_score'],
+                        'Metrics/F1_Precision': f1_data['precision'],
+                        'Metrics/F1_Recall': f1_data['recall']
+                    })
+
+                # Log training loss
+                if 'loss' in train_stats:
+                    wandb_metrics['Loss/Train'] = train_stats['loss']
+
+                self.wandb_logger.log(wandb_metrics, step=epoch)
+
+            # Log F1 metrics to TensorBoard
+            if 'f1_metrics' in test_stats and self.writer and dist_utils.is_main_process():
+                f1_data = test_stats['f1_metrics']['overall']
+                self.writer.add_scalar('Metrics/F1', f1_data['f1_score'], epoch)
+                self.writer.add_scalar('Metrics/F1_Precision', f1_data['precision'], epoch)
+                self.writer.add_scalar('Metrics/F1_Recall', f1_data['recall'], epoch)
+
+            # Track best stats only for list-type metrics (COCO metrics)
+            for k in test_stats:
+                if not isinstance(test_stats[k], list):
+                    continue
 
                 if k in best_stat:
                     best_stat['epoch'] = epoch if test_stats[k][0] > best_stat[k] else best_stat['epoch']

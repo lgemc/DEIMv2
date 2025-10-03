@@ -67,11 +67,15 @@ class BaseSolver(object):
         self.output_dir = Path(cfg.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.writer = cfg.writer
+        self.wandb_logger = cfg.wandb_logger
 
         if self.writer:
             atexit.register(self.writer.close)
             if dist_utils.is_main_process():
                 self.writer.add_text('config', '{:s}'.format(cfg.__repr__()), 0)
+
+        if self.wandb_logger and dist_utils.is_main_process():
+            atexit.register(self.wandb_logger.finish)
 
     def cleanup(self):
         if self.writer:

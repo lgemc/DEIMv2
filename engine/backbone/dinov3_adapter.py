@@ -85,7 +85,11 @@ class DINOv3STAs(nn.Module):
     ):
         super(DINOv3STAs, self).__init__()
         if 'dinov3' in name:
-            self.dinov3 = torch.hub.load('./dinov3', name, source='local', weights=weights_path)
+            self.dinov3 = torch.hub.load('./dinov3', name, source='local', pretrained=False)
+            if weights_path is not None:
+                print(f'Loading DINOv3 checkpoint from {weights_path}...')
+                checkpoint = torch.load(weights_path, map_location='cpu')
+                self.dinov3.load_state_dict(checkpoint, strict=True)
             while len(self.dinov3.blocks) != (interaction_indexes[-1] + 1):
                 del self.dinov3.blocks[-1]
             del self.dinov3.head

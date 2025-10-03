@@ -12,11 +12,12 @@ DEIM:
   backbone: DINOv3STAs
 
 DINOv3STAs:
-  name: vit_tiny
-  embed_dim: 192
-  weights_path: ./ckpts/vitt_distill.pt
+  name: dinov3_vits16
+  weights_path: ./ckpts/dinov3_vits16_pretrain_lvd1689m-08c60483.pth
   interaction_indexes: [5,8,11]   # only need the [1/8, 1/16, 1/32]
-  num_heads: 3
+  finetune: False
+  conv_inplane: 32
+  hidden_dim: 192
 
 HybridEncoder:
   in_channels: [192, 192, 192]
@@ -33,26 +34,17 @@ DEIMTransformer:
   eval_idx: -1  # -2 -3 -4
 
 
-## Optimizer
+## Optimizer (frozen backbone - only train STA/encoder/decoder)
 optimizer:
   type: AdamW
 
   params:
     -
-      # except norm/bn/bias in self.dinov3
-      params: '^(?=.*.dinov3)(?!.*(?:norm|bn|bias)).*$'
-      lr: 0.000025
-    -
-      # including all norm/bn/bias in self.dinov3
-      params: '^(?=.*.dinov3)(?=.*(?:norm|bn|bias)).*$'
-      lr: 0.000025
-      weight_decay: 0.
-    -
-      # including all norm/bn/bias except for the self.dinov3
+      # including all norm/bn/bias in sta/encoder/decoder
       params: '^(?=.*(?:sta|encoder|decoder))(?=.*(?:norm|bn|bias)).*$'
       weight_decay: 0.
 
-  lr: 0.0005
+  lr: 0.0005  # Increased for frozen backbone training
   betas: [0.9, 0.999]
   weight_decay: 0.0001
 
@@ -62,9 +54,11 @@ epoches: 132 # 120 + 4n
 ## Our LR-Scheduler
 flat_epoch: 64    # 4 + epoch // 2, e.g., 40 = 4 + 72 / 2
 no_aug_epoch: 12
+warmup_iter: 500  # reduced from 2000 for faster warmup with pretrained backbone
 
 ## Our DataAug
 train_dataloader:
+  total_batch_size: 12
   dataset:
     transforms:
       ops:
@@ -81,7 +75,9 @@ train_dataloader:
         - {type: Normalize, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225]}
         - {type: ConvertBoxes, fmt: 'cxcywh', normalize: True}
       policy:
+        name: stop_epoch
         epoch: [4, 64, 120]   # list
+        ops: ['Mosaic', 'RandomPhotometricDistort', 'RandomZoomOut', 'RandomIoUCrop']
 
   collate_fn:
     base_size: 640
@@ -99,6 +95,7 @@ val_dataloader:
         - {type: Resize, size: [640, 640], }
         - {type: ConvertPILImage, dtype: 'float32', scale: True}
         - {type: Normalize, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225]}
+        - {type: ConvertBoxes, fmt: 'cxcywh', normalize: True}
 
 DEIMCriterion:
   matcher:

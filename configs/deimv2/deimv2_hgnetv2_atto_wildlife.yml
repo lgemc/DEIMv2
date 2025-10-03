@@ -74,7 +74,7 @@ optimizer:
 
 eval_spatial_size: [320, 320]
 train_dataloader:
-  total_batch_size: 128
+  total_batch_size: 64
   dataset:
     transforms:
       ops:
@@ -105,14 +105,14 @@ train_dataloader:
     base_size_repeat: ~
 
 val_dataloader:
-  total_batch_size: 256
+  total_batch_size: 128
   dataset:
     transforms:
       ops:
         - {type: Resize, size: [320, 320], }
         - {type: ConvertPILImage, dtype: 'float32', scale: True}
   shuffle: False
-  num_workers: 2
+  num_workers: 4
 
 
 DEIMCriterion:

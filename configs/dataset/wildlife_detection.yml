@@ -11,14 +11,16 @@ train_dataloader:
   type: DataLoader
   dataset:
     type: CocoDetection
-    img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_1024_1024/images/train/
-    ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/coco_1024_2014/train.json
+    img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_640_640/train
+    ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/640_640/train_coco.json
+    #img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_640_640/val
+    #ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/640_640/val_coco.json
     return_masks: False
     transforms:
       type: Compose
       ops: ~
   shuffle: True
-  num_workers: 2
+  num_workers: 8
   drop_last: True
   collate_fn:
     type: BatchImageCollateFunction
@@ -28,8 +30,8 @@ val_dataloader:
   type: DataLoader
   dataset:
     type: CocoDetection
-    img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_1024_1024/images/val/
-    ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/coco_1024_2014/val.json
+    img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_640_640/test
+    ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/640_640/test_coco.json
     return_masks: False
     transforms:
       type: Compose
