@@ -43,18 +43,18 @@ optimizer:
     -
       # backbone weights (except norm/bn/bias)
       params: '^(?=.*.dinov3)(?!.*(?:norm|bn|bias)).*$'
-      lr: 0.0001  # Lower LR for pretrained backbone (0.000025 * 4 for batch 128)
+      lr: 0.00000625  # Scaled for batch size 8 (0.0001 * 8/128)
     -
       # backbone norm/bn/bias
       params: '^(?=.*.dinov3)(?=.*(?:norm|bn|bias)).*$'
-      lr: 0.0001
+      lr: 0.00000625
       weight_decay: 0.
     -
       # sta/encoder/decoder norm/bn/bias
       params: '^(?=.*(?:sta|encoder|decoder))(?=.*(?:norm|bn|bias)).*$'
       weight_decay: 0.
 
-  lr: 0.002  # Scaled for batch size 128
+  lr: 0.000125  # Scaled for batch size 8 (0.002 * 8/128)
   betas: [0.9, 0.999]
   weight_decay: 0.0001
 
@@ -99,6 +99,7 @@ train_dataloader:
     copyblend_epochs: [4, 468]
 
 val_dataloader:
+  total_batch_size: 8
   dataset:
     transforms:
       ops:
