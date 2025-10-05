@@ -208,7 +208,7 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
 
                 # Detect box format: check if boxes are in xyxy or xywh format
                 # If x2 < x1 or y2 < y1, boxes are likely in xywh format
-                boxes_are_xywh = (gt_boxes[:, 2] < gt_boxes[:, 0]).any() or (gt_boxes.max() <= 1.0 and gt_boxes[:, 2] < 0.5)
+                boxes_are_xywh = (gt_boxes[:, 2] < gt_boxes[:, 0]).any() or (gt_boxes.max() <= 1.0 and (gt_boxes[:, 2] < 0.5).all())
 
                 # Check if boxes are normalized (values between 0 and 1)
                 if gt_boxes.max() <= 1.0:
