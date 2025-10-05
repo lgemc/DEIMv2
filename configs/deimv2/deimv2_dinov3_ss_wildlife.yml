@@ -12,8 +12,8 @@ DEIM:
   backbone: DINOv3STAs
 
 DINOv3STAs:
-  name: dinov3_vitl16
-  weights_path: ./ckpts/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth
+  name: dinov3_vits16
+  weights_path: ./ckpts/dinov3_vits16_pretrain_lvd1689m-08c60483.pth
   interaction_indexes: [5,8,11]   # only need the [1/8, 1/16, 1/32]
   finetune: True
   conv_inplane: 32
@@ -64,11 +64,11 @@ epoches: 500 # 468 + 32
 ## Our LR-Scheduler
 flat_epoch: 254    # 4 + epoch // 2
 no_aug_epoch: 32
-warmup_iter: 2000
+warmup_iter: 100
 
 ## Our DataAug
 train_dataloader:
-  total_batch_size: 128
+  total_batch_size: 2
   dataset:
     transforms:
       ops:
