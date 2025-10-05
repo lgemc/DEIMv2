@@ -191,10 +191,16 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
                 # So we need to scale GT boxes back to original size for matching
                 orig_h, orig_w = target["orig_size"].cpu().numpy()
 
-                # Get the current (resized) image size - assume square resize to 640x640
+                # Get the current (resized) image size from target or samples
+                if "size" in target:
+                    resize_h, resize_w = target["size"].cpu().numpy()
+                else:
+                    # Fallback: get size from samples tensor (C, H, W)
+                    resize_h, resize_w = samples.shape[-2:]
+
                 # Scale factor to go from resized to original
-                scale_x = orig_w / 640.0
-                scale_y = orig_h / 640.0
+                scale_x = orig_w / resize_w
+                scale_y = orig_h / resize_h
 
                 # Scale boxes to original size
                 gt_boxes_scaled = gt_boxes.copy()
