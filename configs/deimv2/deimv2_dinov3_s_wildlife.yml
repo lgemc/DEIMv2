@@ -68,7 +68,7 @@ warmup_iter: 2000
 
 ## Our DataAug
 train_dataloader:
-  total_batch_size: 128
+  total_batch_size: 8
   dataset:
     transforms:
       ops:
