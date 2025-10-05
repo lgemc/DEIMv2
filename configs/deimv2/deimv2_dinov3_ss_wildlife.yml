@@ -1,0 +1,115 @@
+__include__: [
+  '../dataset/wildlife_detection.yml',
+  '../runtime.yml',
+  '../base/dataloader.yml',
+  '../base/optimizer.yml',
+  '../base/deimv2.yml',
+]
+
+output_dir: ./outputs/deimv2_dinov3_s_wildlife
+
+DEIM:
+  backbone: DINOv3STAs
+
+DINOv3STAs:
+  name: dinov3_vitl16
+  weights_path: ./ckpts/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth
+  interaction_indexes: [5,8,11]   # only need the [1/8, 1/16, 1/32]
+  finetune: True
+  conv_inplane: 32
+  hidden_dim: 192
+  dtype: float16
+
+HybridEncoder:
+  in_channels: [192, 192, 192]
+  depth_mult: 0.67
+  expansion: 0.34
+  hidden_dim: 192
+  dim_feedforward: 512
+
+DEIMTransformer:
+  feat_channels: [192, 192, 192]
+  hidden_dim: 192
+  dim_feedforward: 512
+  num_layers: 4  # 4 5 6
+  eval_idx: -1  # -2 -3 -4
+
+
+## Optimizer (finetune all parameters including backbone)
+optimizer:
+  type: AdamW
+
+  params:
+    -
+      # backbone weights (except norm/bn/bias)
+      params: '^(?=.*.dinov3)(?!.*(?:norm|bn|bias)).*$'
+      lr: 0.0001  # Lower LR for pretrained backbone (0.000025 * 4 for batch 128)
+    -
+      # backbone norm/bn/bias
+      params: '^(?=.*.dinov3)(?=.*(?:norm|bn|bias)).*$'
+      lr: 0.0001
+      weight_decay: 0.
+    -
+      # sta/encoder/decoder norm/bn/bias
+      params: '^(?=.*(?:sta|encoder|decoder))(?=.*(?:norm|bn|bias)).*$'
+      weight_decay: 0.
+
+  lr: 0.002  # Scaled for batch size 128
+  betas: [0.9, 0.999]
+  weight_decay: 0.0001
+
+# Increase to search for the optimal ema
+epoches: 500 # 468 + 32
+
+## Our LR-Scheduler
+flat_epoch: 254    # 4 + epoch // 2
+no_aug_epoch: 32
+warmup_iter: 2000
+
+## Our DataAug
+train_dataloader:
+  total_batch_size: 128
+  dataset:
+    transforms:
+      ops:
+        - {type: Mosaic, output_size: 320, rotation_range: 10, translation_range: [0.1, 0.1], scaling_range: [0.5, 1.5],
+           probability: 1.0, fill_value: 0, use_cache: True, max_cached_images: 50, random_pop: True}
+        - {type: RandomPhotometricDistort, p: 0.5}
+        - {type: RandomZoomOut, fill: 0}
+        - {type: RandomIoUCrop, p: 0.8}
+        - {type: SanitizeBoundingBoxes, min_size: 1}
+        - {type: RandomHorizontalFlip}
+        - {type: Resize, size: [640, 640], }
+        - {type: SanitizeBoundingBoxes, min_size: 1}
+        - {type: ConvertPILImage, dtype: 'float32', scale: True}
+        - {type: Normalize, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225]}
+        - {type: ConvertBoxes, fmt: 'cxcywh', normalize: True}
+      policy:
+        name: stop_epoch
+        epoch: [4, 254, 468]   # list
+        ops: ['Mosaic', 'RandomPhotometricDistort', 'RandomZoomOut', 'RandomIoUCrop']
+
+  collate_fn:
+    base_size: 640
+    mixup_prob: 0.5
+    ema_restart_decay: 0.9999
+    base_size_repeat: 20
+    mixup_epochs: [4, 254]
+    stop_epoch: 468
+    copyblend_epochs: [4, 468]
+
+val_dataloader:
+  dataset:
+    transforms:
+      ops:
+        - {type: Resize, size: [640, 640], }
+        - {type: ConvertPILImage, dtype: 'float32', scale: True}
+        - {type: Normalize, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225]}
+        - {type: ConvertBoxes, fmt: 'cxcywh', normalize: True}
+
+DEIMCriterion:
+  matcher:
+    # change matcher
+    change_matcher: True
+    iou_order_alpha: 4.0
+    matcher_change_epoch: 450

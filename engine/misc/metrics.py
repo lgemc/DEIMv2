@@ -66,6 +66,11 @@ def match_detections(
     # Filter predictions by score threshold
     predictions = [p for p in predictions if p.get('score', 1.0) >= score_threshold]
 
+    print(f"\n[F1 MATCHING DEBUG] Starting matching:")
+    print(f"  Total predictions (before filtering): {len(predictions) + sum(1 for p in predictions if p.get('score', 1.0) < score_threshold)}")
+    print(f"  Total predictions (after score threshold {score_threshold}): {len(predictions)}")
+    print(f"  Total ground truths: {len(ground_truths)}")
+
     # Group by image_id for efficient matching
     preds_by_image = defaultdict(list)
     gts_by_image = defaultdict(list)
@@ -85,16 +90,26 @@ def match_detections(
     # Get all unique image_ids
     all_image_ids = set(list(preds_by_image.keys()) + list(gts_by_image.keys()))
 
+    debug_image_count = 0
     for image_id in all_image_ids:
         img_preds = preds_by_image.get(image_id, [])
         img_gts = gts_by_image.get(image_id, [])
+
+        # Log first few images for debugging
+        if debug_image_count < 3 and (len(img_preds) > 0 or len(img_gts) > 0):
+            print(f"\n[F1 MATCHING DEBUG] Image {image_id}:")
+            print(f"  Predictions: {len(img_preds)}, Ground truths: {len(img_gts)}")
+            if len(img_preds) > 0:
+                print(f"  First pred bbox: {img_preds[0]['bbox']}, score: {img_preds[0].get('score', 1.0):.4f}, class: {img_preds[0]['category_id']}")
+            if len(img_gts) > 0:
+                print(f"  First GT bbox: {img_gts[0]['bbox']}, class: {img_gts[0]['category_id']}")
 
         matched_gts = set()
 
         # Sort predictions by score (highest first) for greedy matching
         img_preds = sorted(img_preds, key=lambda x: x.get('score', 1.0), reverse=True)
 
-        for pred in img_preds:
+        for pred_idx, pred in enumerate(img_preds):
             pred_class = pred['category_id']
             pred_bbox = pred['bbox']
 
@@ -111,6 +126,15 @@ def match_detections(
 
                 dist = center_distance(pred_bbox, gt['bbox'])
 
+                # Log first match attempt for first few images
+                if debug_image_count < 3 and pred_idx == 0 and idx == 0:
+                    pred_center = calculate_box_center(pred_bbox)
+                    gt_center = calculate_box_center(gt['bbox'])
+                    print(f"  Matching pred[0] to gt[0]:")
+                    print(f"    Pred center: ({pred_center[0]:.2f}, {pred_center[1]:.2f})")
+                    print(f"    GT center: ({gt_center[0]:.2f}, {gt_center[1]:.2f})")
+                    print(f"    Distance: {dist:.2f} pixels (threshold: {center_threshold})")
+
                 if dist < best_match_dist:
                     best_match_dist = dist
                     best_match_idx = idx
@@ -120,10 +144,17 @@ def match_detections(
                 true_positives += 1
                 per_class_stats[pred_class]['tp'] += 1
                 matched_gts.add(best_match_idx)
+                if debug_image_count < 3 and pred_idx == 0:
+                    print(f"    -> MATCH (TP) with distance {best_match_dist:.2f}")
             else:
                 # False positive
                 false_positives += 1
                 per_class_stats[pred_class]['fp'] += 1
+                if debug_image_count < 3 and pred_idx == 0:
+                    print(f"    -> NO MATCH (FP)")
+
+        if debug_image_count < 3 and (len(img_preds) > 0 or len(img_gts) > 0):
+            debug_image_count += 1
 
         # Count unmatched ground truths as false negatives
         for idx, gt in enumerate(img_gts):

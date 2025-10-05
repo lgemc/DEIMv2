@@ -167,6 +167,13 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
             # Add predictions
             if len(output["boxes"]) > 0:
                 boxes = output["boxes"].float().cpu().numpy()
+
+                # Log predictions for debugging
+                if dist_utils.is_main_process() and len(all_predictions) < 5:
+                    print(f"\n[F1 DEBUG] Predictions for image {image_id}:")
+                    print(f"  Pred boxes (raw x1y1x2y2): {boxes[0] if len(boxes) > 0 else 'none'}")
+                    print(f"  Pred box max values: x_max={boxes[:, [0,2]].max():.4f}, y_max={boxes[:, [1,3]].max():.4f}")
+
                 # Convert from [x1, y1, x2, y2] to [x, y, w, h]
                 boxes_xywh = boxes.copy()
                 boxes_xywh[:, 2] = boxes[:, 2] - boxes[:, 0]  # width
@@ -174,6 +181,10 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
 
                 scores = output["scores"].float().cpu().numpy()
                 labels = output["labels"].float().cpu().numpy()
+
+                if dist_utils.is_main_process() and len(all_predictions) < 5:
+                    print(f"  Pred boxes (xywh): {boxes_xywh[0]}")
+                    print(f"  Score: {scores[0]:.4f}, Label: {int(labels[0])}")
 
                 for box, score, label in zip(boxes_xywh, scores, labels):
                     all_predictions.append({
@@ -186,26 +197,41 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
             # Add ground truths
             gt_boxes = target["boxes"].float().cpu().numpy()
             if len(gt_boxes) > 0:
-                # Ground truth boxes are in [x1, y1, x2, y2] format in resized image space (e.g., 640x640)
-                # Predictions are already scaled to original image size by postprocessor
-                # So we need to scale GT boxes back to original size for matching
                 orig_h, orig_w = target["orig_size"].cpu().numpy()
 
-                # Get the current (resized) image size from target or samples
-                if "size" in target:
-                    resize_h, resize_w = target["size"].cpu().numpy()
+                # Log first box to check if normalized
+                if dist_utils.is_main_process() and len(all_ground_truths) < 5:
+                    print(f"\n[F1 DEBUG] Image {image_id}:")
+                    print(f"  Original size: {orig_w}x{orig_h}")
+                    print(f"  GT boxes (raw): {gt_boxes[0] if len(gt_boxes) > 0 else 'none'}")
+                    print(f"  GT box max values: x_max={gt_boxes[:, [0,2]].max():.4f}, y_max={gt_boxes[:, [1,3]].max():.4f}")
+
+                # Check if boxes are normalized (values between 0 and 1)
+                if gt_boxes.max() <= 1.0:
+                    # Boxes are normalized, scale to original size
+                    gt_boxes_scaled = gt_boxes.copy()
+                    gt_boxes_scaled[:, [0, 2]] *= orig_w  # x1, x2
+                    gt_boxes_scaled[:, [1, 3]] *= orig_h  # y1, y2
+                    if dist_utils.is_main_process() and len(all_ground_truths) < 5:
+                        print(f"  GT boxes detected as NORMALIZED, scaling to original size")
+                        print(f"  GT boxes (scaled): {gt_boxes_scaled[0]}")
                 else:
-                    # Fallback: get size from samples tensor (C, H, W)
-                    resize_h, resize_w = samples.shape[-2:]
+                    # Boxes are in resized image space, scale to original
+                    if "size" in target:
+                        resize_h, resize_w = target["size"].cpu().numpy()
+                    else:
+                        resize_h, resize_w = samples.shape[-2:]
 
-                # Scale factor to go from resized to original
-                scale_x = orig_w / resize_w
-                scale_y = orig_h / resize_h
+                    scale_x = orig_w / resize_w
+                    scale_y = orig_h / resize_h
 
-                # Scale boxes to original size
-                gt_boxes_scaled = gt_boxes.copy()
-                gt_boxes_scaled[:, [0, 2]] *= scale_x  # x1, x2
-                gt_boxes_scaled[:, [1, 3]] *= scale_y  # y1, y2
+                    gt_boxes_scaled = gt_boxes.copy()
+                    gt_boxes_scaled[:, [0, 2]] *= scale_x  # x1, x2
+                    gt_boxes_scaled[:, [1, 3]] *= scale_y  # y1, y2
+                    if dist_utils.is_main_process() and len(all_ground_truths) < 5:
+                        print(f"  GT boxes detected as RESIZED ({resize_w}x{resize_h}), scaling to original")
+                        print(f"  Scale factors: x={scale_x:.4f}, y={scale_y:.4f}")
+                        print(f"  GT boxes (scaled): {gt_boxes_scaled[0]}")
 
                 # Convert from [x1, y1, x2, y2] to [x, y, w, h]
                 gt_boxes_xywh = gt_boxes_scaled.copy()
