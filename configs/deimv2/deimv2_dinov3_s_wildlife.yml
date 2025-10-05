@@ -15,7 +15,7 @@ DINOv3STAs:
   name: dinov3_vitl16
   weights_path: ./ckpts/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth
   interaction_indexes: [5,8,11]   # only need the [1/8, 1/16, 1/32]
-  finetune: True
+  finetune: False
   conv_inplane: 32
   hidden_dim: 192
   dtype: float16
