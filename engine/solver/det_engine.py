@@ -206,15 +206,34 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
                     print(f"  GT boxes (raw): {gt_boxes[0] if len(gt_boxes) > 0 else 'none'}")
                     print(f"  GT box max values: x_max={gt_boxes[:, [0,2]].max():.4f}, y_max={gt_boxes[:, [1,3]].max():.4f}")
 
+                # Detect box format: check if boxes are in xyxy or xywh format
+                # If x2 < x1 or y2 < y1, boxes are likely in xywh format
+                boxes_are_xywh = (gt_boxes[:, 2] < gt_boxes[:, 0]).any() or (gt_boxes.max() <= 1.0 and gt_boxes[:, 2] < 0.5)
+
                 # Check if boxes are normalized (values between 0 and 1)
                 if gt_boxes.max() <= 1.0:
                     # Boxes are normalized, scale to original size
                     gt_boxes_scaled = gt_boxes.copy()
-                    gt_boxes_scaled[:, [0, 2]] *= orig_w  # x1, x2
-                    gt_boxes_scaled[:, [1, 3]] *= orig_h  # y1, y2
-                    if dist_utils.is_main_process() and len(all_ground_truths) < 5:
-                        print(f"  GT boxes detected as NORMALIZED, scaling to original size")
-                        print(f"  GT boxes (scaled): {gt_boxes_scaled[0]}")
+                    if boxes_are_xywh:
+                        # Format is [x, y, w, h] - scale all components
+                        gt_boxes_scaled[:, [0, 2]] *= orig_w  # x, w
+                        gt_boxes_scaled[:, [1, 3]] *= orig_h  # y, h
+                        gt_boxes_xywh = gt_boxes_scaled  # Already in xywh format
+                        if dist_utils.is_main_process() and len(all_ground_truths) < 5:
+                            print(f"  GT boxes detected as NORMALIZED XYWH, scaling to original size")
+                            print(f"  GT boxes (scaled xywh): {gt_boxes_xywh[0]}")
+                    else:
+                        # Format is [x1, y1, x2, y2] - scale to original then convert
+                        gt_boxes_scaled[:, [0, 2]] *= orig_w  # x1, x2
+                        gt_boxes_scaled[:, [1, 3]] *= orig_h  # y1, y2
+                        # Convert from [x1, y1, x2, y2] to [x, y, w, h]
+                        gt_boxes_xywh = gt_boxes_scaled.copy()
+                        gt_boxes_xywh[:, 2] = gt_boxes_scaled[:, 2] - gt_boxes_scaled[:, 0]  # width
+                        gt_boxes_xywh[:, 3] = gt_boxes_scaled[:, 3] - gt_boxes_scaled[:, 1]  # height
+                        if dist_utils.is_main_process() and len(all_ground_truths) < 5:
+                            print(f"  GT boxes detected as NORMALIZED XYXY, scaling to original size")
+                            print(f"  GT boxes (scaled xyxy): {gt_boxes_scaled[0]}")
+                            print(f"  GT boxes (converted to xywh): {gt_boxes_xywh[0]}")
                 else:
                     # Boxes are in resized image space, scale to original
                     if "size" in target:
@@ -228,15 +247,17 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
                     gt_boxes_scaled = gt_boxes.copy()
                     gt_boxes_scaled[:, [0, 2]] *= scale_x  # x1, x2
                     gt_boxes_scaled[:, [1, 3]] *= scale_y  # y1, y2
+
+                    # Convert from [x1, y1, x2, y2] to [x, y, w, h]
+                    gt_boxes_xywh = gt_boxes_scaled.copy()
+                    gt_boxes_xywh[:, 2] = gt_boxes_scaled[:, 2] - gt_boxes_scaled[:, 0]  # width
+                    gt_boxes_xywh[:, 3] = gt_boxes_scaled[:, 3] - gt_boxes_scaled[:, 1]  # height
+
                     if dist_utils.is_main_process() and len(all_ground_truths) < 5:
                         print(f"  GT boxes detected as RESIZED ({resize_w}x{resize_h}), scaling to original")
                         print(f"  Scale factors: x={scale_x:.4f}, y={scale_y:.4f}")
                         print(f"  GT boxes (scaled): {gt_boxes_scaled[0]}")
-
-                # Convert from [x1, y1, x2, y2] to [x, y, w, h]
-                gt_boxes_xywh = gt_boxes_scaled.copy()
-                gt_boxes_xywh[:, 2] = gt_boxes_scaled[:, 2] - gt_boxes_scaled[:, 0]  # width
-                gt_boxes_xywh[:, 3] = gt_boxes_scaled[:, 3] - gt_boxes_scaled[:, 1]  # height
+                        print(f"  GT boxes (xywh): {gt_boxes_xywh[0]}")
 
                 gt_labels = target["labels"].float().cpu().numpy()
                 for box, label in zip(gt_boxes_xywh, gt_labels):
