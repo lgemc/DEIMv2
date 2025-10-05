@@ -15,7 +15,7 @@ DINOv3STAs:
   name: dinov3_vitl16
   weights_path: ./ckpts/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth
   interaction_indexes: [5,8,11]   # only need the [1/8, 1/16, 1/32]
-  finetune: False
+  finetune: True
   conv_inplane: 32
   hidden_dim: 192
   dtype: float16
@@ -45,21 +45,21 @@ optimizer:
       params: '^(?=.*(?:sta|encoder|decoder))(?=.*(?:norm|bn|bias)).*$'
       weight_decay: 0.
 
-  lr: 0.0005  # Increased for frozen backbone training
+  lr: 0.002  # Scaled for batch size 128
   betas: [0.9, 0.999]
   weight_decay: 0.0001
 
 # Increase to search for the optimal ema
-epoches: 132 # 120 + 4n
+epoches: 500 # 468 + 32
 
 ## Our LR-Scheduler
-flat_epoch: 64    # 4 + epoch // 2, e.g., 40 = 4 + 72 / 2
-no_aug_epoch: 12
-warmup_iter: 500  # reduced from 2000 for faster warmup with pretrained backbone
+flat_epoch: 254    # 4 + epoch // 2
+no_aug_epoch: 32
+warmup_iter: 2000
 
 ## Our DataAug
 train_dataloader:
-  total_batch_size: 2
+  total_batch_size: 128
   dataset:
     transforms:
       ops:
@@ -77,7 +77,7 @@ train_dataloader:
         - {type: ConvertBoxes, fmt: 'cxcywh', normalize: True}
       policy:
         name: stop_epoch
-        epoch: [4, 64, 120]   # list
+        epoch: [4, 254, 468]   # list
         ops: ['Mosaic', 'RandomPhotometricDistort', 'RandomZoomOut', 'RandomIoUCrop']
 
   collate_fn:
@@ -85,9 +85,9 @@ train_dataloader:
     mixup_prob: 0.5
     ema_restart_decay: 0.9999
     base_size_repeat: 20
-    mixup_epochs: [4, 64]
-    stop_epoch: 120
-    copyblend_epochs: [4, 120]
+    mixup_epochs: [4, 254]
+    stop_epoch: 468
+    copyblend_epochs: [4, 468]
 
 val_dataloader:
   dataset:
@@ -103,4 +103,4 @@ DEIMCriterion:
     # change matcher
     change_matcher: True
     iou_order_alpha: 4.0
-    matcher_change_epoch: 100
+    matcher_change_epoch: 450
