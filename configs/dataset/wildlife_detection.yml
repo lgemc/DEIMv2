@@ -11,8 +11,8 @@ train_dataloader:
   type: DataLoader
   dataset:
     type: CocoDetection
-    img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_640_640/train
-    ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/640_640/train_coco.json
+    img_folder: ./data/intermediate/patches_640_640/train
+    ann_file: ./data/processed/640_640/train_coco.json
     #img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_640_640/val
     #ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/640_640/val_coco.json
     return_masks: False
@@ -30,8 +30,8 @@ val_dataloader:
   type: DataLoader
   dataset:
     type: CocoDetection
-    img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_640_640/test
-    ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/640_640/test_coco.json
+    img_folder: ./data/intermediate/patches_640_640/test
+    ann_file: ./data/processed/640_640/test_coco.json
     return_masks: False
     transforms:
       type: Compose

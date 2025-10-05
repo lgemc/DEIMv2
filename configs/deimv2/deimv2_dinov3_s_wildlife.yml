@@ -12,12 +12,13 @@ DEIM:
   backbone: DINOv3STAs
 
 DINOv3STAs:
-  name: dinov3_vits16
-  weights_path: ./ckpts/dinov3_vits16_pretrain_lvd1689m-08c60483.pth
+  name: dinov3_vitl16
+  weights_path: ./ckpts/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth
   interaction_indexes: [5,8,11]   # only need the [1/8, 1/16, 1/32]
   finetune: False
   conv_inplane: 32
   hidden_dim: 192
+  dtype: float16
 
 HybridEncoder:
   in_channels: [192, 192, 192]
@@ -58,7 +59,7 @@ warmup_iter: 500  # reduced from 2000 for faster warmup with pretrained backbone
 
 ## Our DataAug
 train_dataloader:
-  total_batch_size: 12
+  total_batch_size: 2
   dataset:
     transforms:
       ops:

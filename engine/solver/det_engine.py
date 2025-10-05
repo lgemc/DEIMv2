@@ -186,18 +186,25 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
             # Add ground truths
             gt_boxes = target["boxes"].float().cpu().numpy()
             if len(gt_boxes) > 0:
-                # Unnormalize ground truth boxes from [0,1] to pixel coordinates
-                # Ground truth boxes are in normalized cxcywh format (center_x, center_y, width, height)
+                # Ground truth boxes are in [x1, y1, x2, y2] format in resized image space (e.g., 640x640)
+                # Predictions are already scaled to original image size by postprocessor
+                # So we need to scale GT boxes back to original size for matching
                 orig_h, orig_w = target["orig_size"].cpu().numpy()
-                gt_boxes_denorm = gt_boxes.copy()
-                gt_boxes_denorm[:, [0, 2]] *= orig_w  # cx and width
-                gt_boxes_denorm[:, [1, 3]] *= orig_h  # cy and height
 
-                # Convert from [cx, cy, w, h] to [x, y, w, h]
-                gt_boxes_xywh = gt_boxes_denorm.copy()
-                gt_boxes_xywh[:, 0] = gt_boxes_denorm[:, 0] - gt_boxes_denorm[:, 2] / 2  # x = cx - w/2
-                gt_boxes_xywh[:, 1] = gt_boxes_denorm[:, 1] - gt_boxes_denorm[:, 3] / 2  # y = cy - h/2
-                # width and height stay the same at positions 2 and 3
+                # Get the current (resized) image size - assume square resize to 640x640
+                # Scale factor to go from resized to original
+                scale_x = orig_w / 640.0
+                scale_y = orig_h / 640.0
+
+                # Scale boxes to original size
+                gt_boxes_scaled = gt_boxes.copy()
+                gt_boxes_scaled[:, [0, 2]] *= scale_x  # x1, x2
+                gt_boxes_scaled[:, [1, 3]] *= scale_y  # y1, y2
+
+                # Convert from [x1, y1, x2, y2] to [x, y, w, h]
+                gt_boxes_xywh = gt_boxes_scaled.copy()
+                gt_boxes_xywh[:, 2] = gt_boxes_scaled[:, 2] - gt_boxes_scaled[:, 0]  # width
+                gt_boxes_xywh[:, 3] = gt_boxes_scaled[:, 3] - gt_boxes_scaled[:, 1]  # height
 
                 gt_labels = target["labels"].float().cpu().numpy()
                 for box, label in zip(gt_boxes_xywh, gt_labels):

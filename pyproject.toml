@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "calflops>=0.3.2",
     "faster-coco-eval>=1.6.8",
+    "matplotlib>=3.10.6",
     "pyyaml>=6.0.3",
     "scipy>=1.16.2",
     "tensorboard>=2.20.0",
