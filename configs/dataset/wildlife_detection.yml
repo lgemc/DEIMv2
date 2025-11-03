@@ -1,0 +1,43 @@
+task: detection
+
+evaluator:
+  type: CocoEvaluator
+  iou_types: ['bbox', ]
+
+num_classes: 6
+remap_mscoco_category: False
+
+train_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /home/lmanrique/Do/animaldet/data/herdnet/processed/640_bbox/train
+    ann_file: /home/lmanrique/Do/animaldet/data/herdnet/processed/640_coco/annotations/instances_train2017.json
+    #img_folder: /home/lmanrique/Do/WildlifeMapper/data/intermediate/patches_640_640/val
+    #ann_file: /home/lmanrique/Do/WildlifeMapper/data/processed/640_640/val_coco.json
+    return_masks: False
+    transforms:
+      type: Compose
+      ops: ~
+  shuffle: True
+  num_workers: 64
+  drop_last: True
+  collate_fn:
+    type: BatchImageCollateFunction
+
+
+val_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /home/lmanrique/Do/animaldet/data/herdnet/processed/640_bbox/val
+    ann_file: /home/lmanrique/Do/animaldet/data/herdnet/processed/640_coco/annotations/instances_val2017.json
+    return_masks: False
+    transforms:
+      type: Compose
+      ops: ~
+  shuffle: False
+  num_workers: 0
+  drop_last: False
+  collate_fn:
+    type: BatchImageCollateFunction

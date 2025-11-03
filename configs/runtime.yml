@@ -2,6 +2,11 @@ print_freq: 500
 output_dir: './logs'
 checkpoint_freq: 12
 
+# W&B logging (optional)
+use_wandb: True  # Set to True to enable W&B logging
+wandb_project: 'camera-traps'  # Your W&B project name
+wandb_name: null  # Run name (null for auto-generated)
+
 
 sync_bn: True
 find_unused_parameters: True

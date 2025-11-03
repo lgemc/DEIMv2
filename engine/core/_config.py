@@ -41,6 +41,7 @@ class BaseConfig(object):
         self._collate_fn :Callable = None
         self._evaluator :Callable[[nn.Module, DataLoader, str], ] = None
         self._writer: SummaryWriter = None
+        self._wandb_logger = None
 
         # dataset
         self.num_workers :int = 0
@@ -77,6 +78,11 @@ class BaseConfig(object):
         self.output_dir :str = None
         self.summary_dir :str = None
         self.device : str = ''
+
+        # W&B config
+        self.use_wandb :bool = False
+        self.wandb_project :str = None
+        self.wandb_name :str = None
 
     @property
     def model(self, ) -> nn.Module:
@@ -288,6 +294,22 @@ class BaseConfig(object):
     def writer(self, m):
         assert isinstance(m, SummaryWriter), f'{type(m)} must be SummaryWriter'
         self._writer = m
+
+    @property
+    def wandb_logger(self):
+        if self._wandb_logger is None and self.use_wandb:
+            from ..misc.metrics import WandbLogger
+            self._wandb_logger = WandbLogger(
+                project=self.wandb_project,
+                name=self.wandb_name,
+                config=self.__dict__,
+                dir=self.output_dir
+            )
+        return self._wandb_logger
+
+    @wandb_logger.setter
+    def wandb_logger(self, logger):
+        self._wandb_logger = logger
 
     def __repr__(self, ):
         s = ''

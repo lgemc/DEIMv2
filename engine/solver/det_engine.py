@@ -19,6 +19,7 @@ from torch.cuda.amp.grad_scaler import GradScaler
 from ..optim import ModelEMA, Warmup
 from ..data import CocoEvaluator
 from ..misc import MetricLogger, SmoothedValue, dist_utils
+from ..misc import evaluate_detection_f1
 
 
 def train_one_epoch(self_lr_scheduler, lr_scheduler, model: torch.nn.Module, criterion: torch.nn.Module,
@@ -137,6 +138,10 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
     # coco_evaluator = CocoEvaluator(base_ds, iou_types)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
+    # Collect predictions and GTs for F1 calculation
+    all_predictions = []
+    all_ground_truths = []
+
     for samples, targets in metric_logger.log_every(data_loader, 10, header):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
@@ -146,6 +151,12 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
 
         results = postprocessor(outputs, orig_target_sizes)
+
+        # Collect predictions and ground truths BEFORE COCO evaluator processing
+        from engine.misc.metrics import collect_predictions_and_gts
+        preds, gts = collect_predictions_and_gts(results, targets, convert_boxes=True)
+        all_predictions.extend(preds)
+        all_ground_truths.extend(gts)
 
         # if 'segm' in postprocessor.keys():
         #     target_sizes = torch.stack([t["size"] for t in targets], dim=0)
@@ -173,5 +184,37 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, postprocessor, 
             stats['coco_eval_bbox'] = coco_evaluator.coco_eval['bbox'].stats.tolist()
         if 'segm' in iou_types:
             stats['coco_eval_masks'] = coco_evaluator.coco_eval['segm'].stats.tolist()
+
+    # Compute center-based F1 metrics
+    if coco_evaluator is not None and dist_utils.is_main_process():
+        try:
+            # Use predictions collected directly from model outputs
+            # (NOT from COCO evaluator which may filter them)
+
+            # Get class names from coco_evaluator
+            try:
+                class_names = {cat['id']: cat['name'] for cat in coco_evaluator.coco_gt.dataset['categories']}
+            except:
+                class_names = None
+
+            # Calculate F1 metrics with pixel-based threshold
+            f1_metrics = evaluate_detection_f1(
+                predictions=all_predictions,
+                ground_truths=all_ground_truths,
+                center_threshold=20.0,
+                score_threshold=0.5,
+                class_names=class_names
+            )
+            stats['f1_metrics'] = f1_metrics
+            print(f"\nCenter-based F1 Metrics (threshold=20px, score>=0.5):")
+            print(f"  Overall F1: {f1_metrics['overall']['f1_score']:.4f}")
+            print(f"  Precision: {f1_metrics['overall']['precision']:.4f}")
+            print(f"  Recall: {f1_metrics['overall']['recall']:.4f}")
+            print(f"  Total predictions: {len(all_predictions)}")
+            print(f"  Total ground truths: {len(all_ground_truths)}")
+        except Exception as e:
+            print(f"Warning: Failed to compute F1 metrics: {e}")
+            import traceback
+            traceback.print_exc()
 
     return stats, coco_evaluator
